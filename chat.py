@@ -3,11 +3,30 @@ import hashlib
 import chromadb
 import numpy as np
 from pathlib import Path
+from dotenv import load_dotenv
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
+from langchain_groq import ChatGroq
 
-def load_pdfs(pdf_path):
+# Load environment variables from .env
+load_dotenv()
+
+groq_api_key = os.getenv("GROQ_API_KEY")
+
+if not groq_api_key:
+    print("Warning: GROQ_API_KEY is not set in .env file.")
+
+# Initialize Groq LLM
+llm = ChatGroq(
+    groq_api_key=groq_api_key,
+    model_name="openai/gpt-oss-20b",
+    temperature=0.5,
+    max_tokens=1024,
+)
+
+
+def load_pdfs(pdf_path="data/pdf"):
     all_documents = []
     pdf_files = list(Path(pdf_path).glob("**/*.pdf"))
     print(f"Found {len(pdf_files)} PDF files")
@@ -66,24 +85,20 @@ class VectorStore:
         texts = []
         metadatas = []
         embedding_list = []
-
         for i, (doc, embedding) in enumerate(zip(documents, embeddings)):
             source = doc.metadata.get("source_file", "unknown")
             page = doc.metadata.get("page", 0)
             doc_id = hashlib.md5(f"{source}_{page}_{i}".encode()).hexdigest()
-
             ids.append(doc_id)
             texts.append(doc.page_content)
             metadatas.append(dict(doc.metadata))
             embedding_list.append(embedding.tolist())
-
         self.collection.upsert(
             ids=ids,
             documents=texts,
             metadatas=metadatas,
             embeddings=embedding_list
         )
-
         print(f"Stored {len(documents)} chunks")
         print(f"Total chunks in database: {self.collection.count()}")
 
@@ -96,13 +111,11 @@ class RAGRetriever:
     def retrieve(self, query, top_k=5):
         print(f"User query: {query}")
         query_embedding = self.embedding_manager.generate_embedding([query])[0]
-
         try:
             results = self.vector_store.collection.query(
                 query_embeddings=[query_embedding.tolist()],
                 n_results=top_k
             )
-
             retrieved_docs = []
             documents = results["documents"][0]
             metadatas = results["metadatas"][0]
@@ -120,31 +133,82 @@ class RAGRetriever:
 
             print(f"Retrieved {len(retrieved_docs)} chunks")
             return retrieved_docs
-
         except Exception as e:
             print(f"Retrieval error: {e}")
             return []
 
 
-documents = load_pdfs("data/pdf")
-chunks = split_documents(documents)
+def rag_simple(query, retriever, llm, top_k=3):
+    results = retriever.retrieve(query, top_k=top_k)
 
-embedding_model = Embedding()
+    context = ""
+    for doc in results:
+        context += (
+            f"Source: {doc['metadata'].get('source_file')}\n"
+            f"Page: {doc['metadata'].get('page')}\n"
+            f"Content: {doc['document']}\n\n"
+        )
 
-texts = [doc.page_content for doc in chunks]
-embeddings = embedding_model.generate_embedding(texts)
+    if not context:
+        return "No relevant context found in documents."
 
-vector_store = VectorStore()
-vector_store.add_documents(chunks, embeddings)
+    prompt = f"""
+You are a helpful AI assistant.
 
-retriever = RAGRetriever(vector_store, embedding_model)
+Answer the user's question only from the given context make with help of llm and give proper sentence.
 
-results = retriever.retrieve("What is the source file name?")
+If the answer is not available in the context , reply:
+"."
 
-for result in results:
-    print("Rank:", result["rank"])
-    print("Source:", result["metadata"].get("source_file"))
-    print("Page:", result["metadata"].get("page"))
-    print("Distance:", result["distance"])
-    print("Content:", result["document"][:300])
-    print("-" * 50)
+Context:
+{context}
+
+Question:
+{query}
+
+Answer:
+"""
+    response = llm.invoke(prompt)
+    return response.content
+
+
+if __name__ == "__main__":
+    vector_store = VectorStore()
+    embedding_model = Embedding()
+    
+    if vector_store.collection.count() == 0:
+        documents = load_pdfs("data/pdf")
+        chunks = split_documents(documents)
+        texts = [doc.page_content for doc in chunks]
+        embeddings = embedding_model.generate_embedding(texts)
+        vector_store.add_documents(chunks, embeddings)
+    else:
+        print("Vector database already exists. Skipping indexing.")
+
+    retriever = RAGRetriever(
+        vector_store,
+        embedding_model
+    )
+
+    while True:
+        try:
+            query = input("\nAsk your question (type 'exit' to quit): ").strip()
+            if not query:
+                continue
+
+            if query.lower() in ["exit", "quit"]:
+                print("Goodbye!")
+                break
+
+            answer = rag_simple(
+                query=query,
+                retriever=retriever,
+                llm=llm,
+                top_k=3
+            )
+
+            print("\nAnswer:")
+            print(answer)
+        except (KeyboardInterrupt, EOFError):
+            print("\nGoodbye!")
+            break
