@@ -1,6 +1,5 @@
 import asyncio
 from dotenv import load_dotenv
-
 from langchain_groq import ChatGroq
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.prebuilt import create_react_agent
@@ -9,7 +8,6 @@ load_dotenv()
 
 
 async def main():
-    # Connect to MCP servers
     client = MultiServerMCPClient(
         {
             "maths": {
@@ -24,33 +22,27 @@ async def main():
         }
     )
 
-    # Load tools from both servers
     tools = await client.get_tools()
 
-    # Load LLM
     model = ChatGroq(
         model="llama-3.3-70b-versatile",
     )
 
-    # Create ReAct agent
     agent = create_react_agent(
         model=model,
         tools=tools,
     )
 
-    # Ask a question
     response = await agent.ainvoke(
         {
             "messages": [
                 {
                     "role": "user",
-                    "content": "What is the weather in Chennai?"
+                    "content": "What is addition of 3+5."
                 }
             ]
         }
     )
-
-    # Print final response
     print("\nAssistant:")
     print(response["messages"][-1].content)
 
