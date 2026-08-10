@@ -8,22 +8,25 @@ from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
 from langchain_groq import ChatGroq
+from langchain_ollama import ChatOllama
 
 # Load environment variables from .env
-load_dotenv()
+#load_dotenv()
 
-groq_api_key = os.getenv("GROQ_API_KEY")
+###groq_api_key = os.getenv("GROQ_API_KEY")
 
-if not groq_api_key:
-    print("Warning: GROQ_API_KEY is not set in .env file.")
+ollama=ChatOllama(model="hf.co/bartowski/Llama-3.2-3B-Instruct-GGUF")
+
+##if not groq_api_key:
+    ##print("Warning: GROQ_API_KEY is not set in .env file."##)
 
 # Initialize Groq LLM
-llm = ChatGroq(
-    groq_api_key=groq_api_key,
-    model_name="openai/gpt-oss-20b",
-    temperature=0.5,
-    max_tokens=1024,
-)
+##llm = ChatGroq(
+    ##groq_api_key=groq_api_key,
+    ##model_name="openai/gpt-oss-20b",
+    ##temperature=0.5,
+    ##max_tokens=1024,
+##)
 
 
 def load_pdfs(pdf_path="data/pdf"):
@@ -155,10 +158,9 @@ def rag_simple(query, retriever, llm, top_k=3):
     prompt = f"""
 You are a helpful AI assistant.
 
-Answer the user's question only from the given context make with help of llm and give proper sentence.
+First, use the provided context to answer the question.
 
-If the answer is not available in the context , reply:
-"."
+If the context does not contain the answer, use your own knowledge to answer clearly. Mention that the answer is based on general knowledge rather than the provided documents.
 
 Context:
 {context}
@@ -168,7 +170,7 @@ Question:
 
 Answer:
 """
-    response = llm.invoke(prompt)
+    response = ollama.invoke(prompt)
     return response.content
 
 
@@ -203,7 +205,7 @@ if __name__ == "__main__":
             answer = rag_simple(
                 query=query,
                 retriever=retriever,
-                llm=llm,
+                llm=ollama,
                 top_k=3
             )
 
