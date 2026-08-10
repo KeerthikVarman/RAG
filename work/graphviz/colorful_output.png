@@ -1,0 +1,39 @@
+
+// Colorful Test Diagram
+digraph {
+    // 1. Overall Graph Styling
+    rankdir=LR;  
+    bgcolor="#F0F8FF"; 
+    fontname="Arial, Helvetica, sans-serif";
+    label="My First Colorful Diagram";
+    fontsize=16;
+
+    // 2. Global Defaults for all Nodes
+    node [
+        fontname="Arial, Helvetica, sans-serif",
+        style="filled",
+        penwidth=2,
+        shape=box,
+        margin=0.2
+    ];
+
+    // 3. Define colorful nodes
+    A [label="Setup Graphviz", 
+       fillcolor="#FFB6C1", 
+       color="#DC143C", 
+       fontcolor="#8B0000"]
+
+    B [label="Generate Diagrams!", 
+       fillcolor="#98FB98", 
+       color="#2E8B57", 
+       fontcolor="#191970"]
+
+    // 4. Define colorful edges
+    A -> B [
+        label=" Success! ", 
+        color="#FFA500", 
+        fontcolor="#A0522D",
+        penwidth=2.5, 
+        arrowsize=1.2
+    ]
+}

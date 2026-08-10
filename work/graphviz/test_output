@@ -1,0 +1,6 @@
+// Test Diagram
+digraph {
+	A [label="Setup Graphviz"]
+	B [label="Generate Diagrams!"]
+	A -> B
+}
