@@ -1,13 +1,4 @@
-langchain
-langchain-core
-langchain-community
 langchain-groq
-python-dotenv
-pypdf
-pymupdf
-sentence_transformers
-faiss-cpu
-chromadb
-numpy
-transformers
-torch
+langchain-mcp-adapters
+mcp
+langgraph
