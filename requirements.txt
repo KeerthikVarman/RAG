@@ -11,3 +11,4 @@ chromadb
 numpy
 transformers
 torch
+streamlit

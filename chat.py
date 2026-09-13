@@ -64,7 +64,7 @@ class Embedding:
     def __init__(self, model_name="all-MiniLM-L6-v2"):
         self.model_name = model_name
         self.model = SentenceTransformer(model_name)
-        print(f"Embedding dimension: {self.model.get_sentence_embedding_dimension()}")
+        print(f"Embedding dimension: {self.model.get_embedding_dimension()}")
 
     def generate_embedding(self, texts):
         print(f"Generating embeddings for {len(texts)} texts")
@@ -138,7 +138,7 @@ class RAGRetriever:
             return []
 
 
-def rag_simple(query, retriever, llm, top_k=3):
+def rag_with_sources(query, retriever, llm, top_k=3):
     results = retriever.retrieve(query, top_k=top_k)
 
     context = ""
@@ -150,7 +150,7 @@ def rag_simple(query, retriever, llm, top_k=3):
         )
 
     if not context:
-        return "No relevant context found in documents."
+        return "No relevant context found in documents.", []
 
     prompt = f"""
 You are a helpful AI assistant.
@@ -169,7 +169,12 @@ Question:
 Answer:
 """
     response = llm.invoke(prompt)
-    return response.content
+    return response.content, results
+
+
+def rag_simple(query, retriever, llm, top_k=3):
+    answer, _ = rag_with_sources(query, retriever, llm, top_k=top_k)
+    return answer
 
 
 if __name__ == "__main__":
