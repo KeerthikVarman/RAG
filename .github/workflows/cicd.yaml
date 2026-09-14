@@ -47,7 +47,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: false
-          tags: pdf-rag-app:test
+          tags: keerthikvarmaa123/demo2:test
 
   # --------------------------------------------------------
   # 2. Continuous Deployment (Build & Push to Docker Hub)
