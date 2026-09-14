@@ -75,7 +75,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ secrets.DOCKERHUB_USERNAME }}/pdf-rag-app
+          images: keerthikvarmaa123/demo2
           tags: |
             type=raw,value=latest
             type=sha,format=short
@@ -104,9 +104,9 @@ jobs:
   #         username: ${{ secrets.SERVER_USER }}
   #         key: ${{ secrets.SSH_PRIVATE_KEY }}
   #         script: |
-  #           docker pull ${{ secrets.DOCKERHUB_USERNAME }}/pdf-rag-app:latest
+  #           docker pull keerthikvarmaa123/demo2:latest
   #           docker stop rag-app || true
   #           docker rm rag-app || true
   #           docker run -d --name rag-app -p 8501:8501 \
   #             -e GROQ_API_KEY="${{ secrets.GROQ_API_KEY }}" \
-  #             ${{ secrets.DOCKERHUB_USERNAME }}/pdf-rag-app:latest
+  #             keerthikvarmaa123/demo2:latest
