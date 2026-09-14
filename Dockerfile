@@ -27,9 +27,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 COPY . .
 
 # Ensure data directories exist for PDF uploads and vector store persistence
-
-
-
+RUN mkdir -p data/pdf data/vector_store
 
 # Expose Streamlit's default port
 EXPOSE 8501
