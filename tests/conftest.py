@@ -1,8 +1,12 @@
+import os
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock
 import pytest
 from langchain_core.documents import Document
+
+# Set default GROQ_API_KEY for CI environment before importing project modules
+os.environ.setdefault("GROQ_API_KEY", "gsk_dummy_key_for_testing")
 
 # Ensure parent directory (project root) is on sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))

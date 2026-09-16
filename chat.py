@@ -19,7 +19,7 @@ if not groq_api_key:
 
 # Initialize Groq LLM
 llm = ChatGroq(
-    groq_api_key=groq_api_key,
+    groq_api_key=groq_api_key or "gsk_dummy_key_for_testing",
     model_name="openai/gpt-oss-20b",
     temperature=0.5,
     max_tokens=1024,

@@ -39,6 +39,8 @@ jobs:
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
       - name: Run Pytest Tests
+        env:
+          GROQ_API_KEY: "gsk_dummy_key_for_testing"
         run: |
           pytest tests/
 
