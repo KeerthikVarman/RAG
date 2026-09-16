@@ -12,3 +12,5 @@ numpy
 transformers
 torch
 streamlit
+pytest
+pytest-mock

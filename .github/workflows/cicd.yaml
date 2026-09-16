@@ -38,6 +38,10 @@ jobs:
           # Exit-zero treats all warnings flexibly
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
+      - name: Run Pytest Tests
+        run: |
+          pytest tests/
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -47,7 +51,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: false
-          tags: keerthikvarmaa123/demo2:test
+          tags: keerthikvarmaa123/demo2:${{ github.sha }}
 
   # --------------------------------------------------------
   # 2. Continuous Deployment (Build & Push to Docker Hub)
