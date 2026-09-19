@@ -14,3 +14,7 @@ torch
 streamlit
 pytest
 pytest-mock
+fastapi
+uvicorn
+python-multipart
+httpx
