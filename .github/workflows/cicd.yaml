@@ -2,43 +2,45 @@ name: CI/CD Pipeline - PDF RAG System
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: ["main", "master"]
   pull_request:
-    branches: [ "main", "master" ]
+    branches: ["main", "master"]
   workflow_dispatch:
 
 jobs:
-  # --------------------------------------------------------
-  # 1. Continuous Integration (Linting, Syntax Check & Docker Build Test)
-  # --------------------------------------------------------
+
+  # ============================================================
+  # 1. CONTINUOUS INTEGRATION
+  # ============================================================
   ci:
-    name: Build & Test (CI)
+    name: Build and Test
     runs-on: ubuntu-latest
 
     steps:
+
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.10
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
-          cache: 'pip'
+          python-version: "3.10"
+          cache: "pip"
 
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install flake8
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
 
-      - name: Lint Code with Flake8
+      - name: Run Flake8
         run: |
-          # Stop build if there are syntax errors or undefined names
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          # Exit-zero treats all warnings flexibly
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
-      - name: Run Pytest Tests
+      - name: Run Pytest
         env:
           GROQ_API_KEY: "gsk_dummy_key_for_testing"
         run: |
@@ -47,31 +49,38 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Docker Image (CI Test)
-        uses: docker/build-push-action@v5
+      - name: Test Docker Build
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
           push: false
           tags: keerthikvarmaa123/demo2:${{ github.sha }}
 
-  # --------------------------------------------------------
-  # 2. Continuous Deployment (Build & Push to Docker Hub)
-  # --------------------------------------------------------
+
+  # ============================================================
+  # 2. CONTINUOUS DEPLOYMENT - DOCKER HUB
+  # ============================================================
   cd:
-    name: Build & Push Docker Image (CD)
+    name: Build and Push Docker Image
     needs: ci
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+
+    if: >
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' ||
+       github.ref == 'refs/heads/master')
+
     runs-on: ubuntu-latest
 
     steps:
+
       - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Docker Hub
+      - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -87,7 +96,7 @@ jobs:
             type=sha,format=short
 
       - name: Build and Push Docker Image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
@@ -95,24 +104,54 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-  # --------------------------------------------------------
-  # 3. Deployment to Server / Cloud (Optional Step)
-  # --------------------------------------------------------
-  # deploy:
-  #   name: Deploy to Server
-  #   needs: cd
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Deploy Container via SSH
-  #       uses: appleboy/ssh-action@v1.0.3
-  #       with:
-  #         host: ${{ secrets.SERVER_HOST }}
-  #         username: ${{ secrets.SERVER_USER }}
-  #         key: ${{ secrets.SSH_PRIVATE_KEY }}
-  #         script: |
-  #           docker pull keerthikvarmaa123/demo2:latest
-  #           docker stop rag-app || true
-  #           docker rm rag-app || true
-  #           docker run -d --name rag-app -p 8501:8501 \
-  #             -e GROQ_API_KEY="${{ secrets.GROQ_API_KEY }}" \
-  #             keerthikvarmaa123/demo2:latest
+
+  # ============================================================
+  # 3. DEPLOY TO GOOGLE CLOUD VM
+  # ============================================================
+  deploy:
+    name: Deploy to Google Cloud
+    needs: cd
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Deploy to Google Cloud VM
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+          script: |
+
+            echo "Connected to Google Cloud VM"
+
+            echo "Checking Docker..."
+            docker --version
+
+            echo "Pulling latest image..."
+            docker pull keerthikvarmaa123/demo2:latest
+
+            echo "Stopping old container..."
+            docker stop rag-app || true
+
+            echo "Removing old container..."
+            docker rm rag-app || true
+
+            echo "Starting new container..."
+
+            docker run -d \
+              --name rag-app \
+              -p 8501:8501 \
+              -e GROQ_API_KEY="${{ secrets.GROQ_API_KEY }}" \
+              --restart unless-stopped \
+              keerthikvarmaa123/demo2:latest
+
+            echo "Deployment completed"
+
+            echo "Running containers:"
+            docker ps
+
+            echo "Recent logs:"
+            docker logs --tail 50 rag-app
