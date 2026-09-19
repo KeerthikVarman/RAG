@@ -17,7 +17,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Checkout Code
         uses: actions/checkout@v4
 
@@ -73,7 +72,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Checkout Code
         uses: actions/checkout@v4
 
@@ -109,13 +107,12 @@ jobs:
   # 3. DEPLOY TO GOOGLE CLOUD VM
   # ============================================================
   deploy:
-    name: Deploy to Google Cloud
+    name: Deploy to Google Cloud VM
     needs: cd
 
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Deploy to Google Cloud VM
         uses: appleboy/ssh-action@v1.2.2
         with:
@@ -124,23 +121,21 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
 
           script: |
-
             echo "Connected to Google Cloud VM"
 
             echo "Checking Docker..."
             docker --version
 
-            echo "Pulling latest image..."
+            echo "Pulling latest Docker image..."
             docker pull keerthikvarmaa123/demo2:latest
 
-            echo "Stopping old container..."
+            echo "Stopping existing container..."
             docker stop rag-app || true
 
-            echo "Removing old container..."
+            echo "Removing existing container..."
             docker rm rag-app || true
 
             echo "Starting new container..."
-
             docker run -d \
               --name rag-app \
               -p 8501:8501 \
@@ -148,10 +143,10 @@ jobs:
               --restart unless-stopped \
               keerthikvarmaa123/demo2:latest
 
-            echo "Deployment completed"
+            echo "Deployment completed successfully"
 
             echo "Running containers:"
             docker ps
 
-            echo "Recent logs:"
+            echo "Recent application logs:"
             docker logs --tail 50 rag-app
