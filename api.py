@@ -108,7 +108,6 @@ class DocumentListResponse(BaseModel):
 # ----------------- HELPER FUNCTIONS -----------------
 def index_pdf_documents() -> int:
     """Helper function to process and index PDFs into ChromaDB."""
-    global vector_store, embedding_model
     if not vector_store or not embedding_model:
         raise HTTPException(status_code=500, detail="RAG components not initialized")
 
