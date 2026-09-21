@@ -1,0 +1,114 @@
+# ============================================================
+# Google Cloud Build Configuration
+# PDF RAG System CI/CD Pipeline
+# ============================================================
+
+steps:
+
+  # ------------------------------------------------------------
+  # Step 1: Run Python Unit Tests & Linting
+  # ------------------------------------------------------------
+  - name: 'python:3.10-slim'
+    id: 'run-tests'
+    dir: 'RAG'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "=== Installing test dependencies ==="
+        python -m pip install --upgrade pip
+        pip install flake8 pytest
+
+        if [ -f requirements.txt ]; then
+          pip install -r requirements.txt
+        fi
+
+        echo "=== Running Flake8 Linting ==="
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+
+        echo "=== Executing Pytest Suite ==="
+        pytest tests/
+    env:
+      - 'GROQ_API_KEY=gsk_dummy_key_for_testing'
+      - 'STREAMLIT_BROWSER_GATHER_USAGE_STATS=false'
+
+  # ------------------------------------------------------------
+  # Step 2: Pull Existing Image for Docker Cache
+  # ------------------------------------------------------------
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'pull-cache'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        docker pull \
+        ${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:latest \
+        || true
+
+  # ------------------------------------------------------------
+  # Step 3: Build Docker Image
+  # ------------------------------------------------------------
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-image'
+    args:
+      - 'build'
+      - '-t'
+      - '${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:$COMMIT_SHA'
+      - '-t'
+      - '${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:latest'
+      - '--cache-from'
+      - '${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:latest'
+      - '-f'
+      - 'RAG/Dockerfile'
+      - 'RAG'
+
+  # ------------------------------------------------------------
+  # Step 4: Push Docker Image to Artifact Registry
+  # ------------------------------------------------------------
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-image'
+    args:
+      - 'push'
+      - '--all-tags'
+      - '${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}'
+
+  # ------------------------------------------------------------
+  # Step 5: Deploy to Cloud Run
+  # ------------------------------------------------------------
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-cloud-run'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - '${_SERVICE_NAME}'
+      - '--image'
+      - '${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:$COMMIT_SHA'
+      - '--region'
+      - '${_LOCATION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+
+# ------------------------------------------------------------
+# Registered build artifacts
+# ------------------------------------------------------------
+images:
+  - '${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:$COMMIT_SHA'
+  - '${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:latest'
+
+# ------------------------------------------------------------
+# Substitution variables
+# ------------------------------------------------------------
+substitutions:
+  _LOCATION: 'asia-south1'
+  _REPO_NAME: 'rag'
+  _IMAGE_NAME: 'rag-app'
+  _SERVICE_NAME: 'rag-app'
+
+# ------------------------------------------------------------
+# Build options
+# ------------------------------------------------------------
+options:
+  logging: 'CLOUD_LOGGING_ONLY'
+  machineType: 'E2_HIGHCPU_8'

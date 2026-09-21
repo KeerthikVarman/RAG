@@ -64,4 +64,4 @@ Place the PDF files inside the `data/pdf` folder and run:
 python main.py
 ```
 
-Or execute `python chat.py` directly for testing the pipeline.
+Or execute `python chat.py` directly for testing the pipeline.
