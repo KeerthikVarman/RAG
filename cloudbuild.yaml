@@ -1,21 +1,20 @@
-# ============================================================
-# Google Cloud Build Configuration
-# PDF RAG System CI/CD Pipeline
-# ============================================================
-
 steps:
 
-  # ------------------------------------------------------------
-  # Step 1: Run Python Unit Tests & Linting
-  # ------------------------------------------------------------
+  # ==========================================================
+  # 1. TEST
+  # ==========================================================
   - name: 'python:3.10-slim'
     id: 'run-tests'
-    dir: 'RAG'
+
     entrypoint: 'bash'
+
     args:
       - '-c'
       - |
-        echo "=== Installing test dependencies ==="
+        set -e
+
+        echo "Installing dependencies..."
+
         python -m pip install --upgrade pip
         pip install flake8 pytest
 
@@ -23,92 +22,143 @@ steps:
           pip install -r requirements.txt
         fi
 
-        echo "=== Running Flake8 Linting ==="
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        echo "Running Flake8..."
 
-        echo "=== Executing Pytest Suite ==="
-        pytest tests/
-    env:
-      - 'GROQ_API_KEY=gsk_dummy_key_for_testing'
-      - 'STREAMLIT_BROWSER_GATHER_USAGE_STATS=false'
+        flake8 . \
+          --count \
+          --select=E9,F63,F7,F82 \
+          --show-source \
+          --statistics
 
-  # ------------------------------------------------------------
-  # Step 2: Pull Existing Image for Docker Cache
-  # ------------------------------------------------------------
-  - name: 'gcr.io/cloud-builders/docker'
-    id: 'pull-cache'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        docker pull \
-        ${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:latest \
-        || true
+        echo "Running tests..."
 
-  # ------------------------------------------------------------
-  # Step 3: Build Docker Image
-  # ------------------------------------------------------------
+        if [ -d tests ]; then
+          pytest tests/
+        else
+          echo "No tests directory found."
+        fi
+
+        echo "Tests completed successfully."
+
+
+  # ==========================================================
+  # 2. BUILD DOCKER IMAGE
+  # ==========================================================
   - name: 'gcr.io/cloud-builders/docker'
     id: 'build-image'
+
     args:
       - 'build'
+
       - '-t'
       - '${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:$COMMIT_SHA'
+
       - '-t'
       - '${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:latest'
-      - '--cache-from'
-      - '${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:latest'
-      - '-f'
-      - 'RAG/Dockerfile'
-      - 'RAG'
 
-  # ------------------------------------------------------------
-  # Step 4: Push Docker Image to Artifact Registry
-  # ------------------------------------------------------------
+      - '-f'
+      - 'Dockerfile'
+
+      - '.'
+
+
+  # ==========================================================
+  # 3. PUSH IMAGE TO ARTIFACT REGISTRY
+  # ==========================================================
   - name: 'gcr.io/cloud-builders/docker'
     id: 'push-image'
+
     args:
       - 'push'
       - '--all-tags'
       - '${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}'
 
-  # ------------------------------------------------------------
-  # Step 5: Deploy to Cloud Run
-  # ------------------------------------------------------------
+
+  # ==========================================================
+  # 4. DEPLOY TO CLOUD RUN
+  # ==========================================================
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'deploy-cloud-run'
+
     entrypoint: 'gcloud'
+
     args:
+
       - 'run'
       - 'deploy'
       - '${_SERVICE_NAME}'
+
+      # Docker image
       - '--image'
       - '${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:$COMMIT_SHA'
+
+      # Region
       - '--region'
       - '${_LOCATION}'
+
+      # Managed Cloud Run
       - '--platform'
       - 'managed'
+
+      # Public access
       - '--allow-unauthenticated'
 
-# ------------------------------------------------------------
-# Registered build artifacts
-# ------------------------------------------------------------
+      # CPU
+      - '--cpu'
+      - '2'
+
+      # Memory
+      - '--memory'
+      - '4Gi'
+
+      # Scaling
+      - '--min-instances'
+      - '0'
+
+      - '--max-instances'
+      - '1'
+
+      # Container port
+      - '--port'
+      - '8000'
+
+      # Secret Manager
+      - '--set-secrets'
+      - 'GROQ_API_KEY=GROQ_API_KEY:latest'
+
+
+# ==========================================================
+# IMAGES
+# ==========================================================
+
 images:
+
   - '${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:$COMMIT_SHA'
+
   - '${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:latest'
 
-# ------------------------------------------------------------
-# Substitution variables
-# ------------------------------------------------------------
+
+# ==========================================================
+# VARIABLES
+# ==========================================================
+
 substitutions:
+
   _LOCATION: 'asia-south1'
+
   _REPO_NAME: 'rag'
+
   _IMAGE_NAME: 'rag-app'
+
   _SERVICE_NAME: 'rag-app'
 
-# ------------------------------------------------------------
-# Build options
-# ------------------------------------------------------------
+
+# ==========================================================
+# BUILD OPTIONS
+# ==========================================================
+
 options:
+
+  machineType: 'E2_STANDARD_2'
+
   logging: 'CLOUD_LOGGING_ONLY'
-  machineType: 'E2_HIGHCPU_8'
