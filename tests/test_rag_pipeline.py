@@ -8,12 +8,13 @@ def test_rag_with_sources_no_context():
     mock_retriever = MagicMock()
     mock_retriever.retrieve.return_value = []
     mock_llm = MagicMock()
+    mock_llm.invoke.return_value.content = "General AI answer"
 
-    answer, sources = rag_with_sources("Unknown question", mock_retriever, mock_llm)
+    answer, sources = rag_with_sources("Who is the Prime Minister of India?", mock_retriever, mock_llm)
 
-    assert answer == "No relevant context found in documents."
+    assert answer == "General AI answer"
     assert sources == []
-    mock_llm.invoke.assert_not_called()
+    mock_llm.invoke.assert_called_once()
 
 
 def test_rag_with_sources_with_context(mock_retriever, mock_llm):

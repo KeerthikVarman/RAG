@@ -139,37 +139,42 @@ class RAGRetriever:
 
 
 def rag_with_sources(query, retriever, llm, top_k=3):
-    results = retriever.retrieve(query, top_k=top_k)
+    results = retriever.retrieve(query, top_k=top_k) if retriever else []
 
     context = ""
-    for doc in results:
-        context += (
-            f"Source: {doc['metadata'].get('source_file')}\n"
-            f"Page: {doc['metadata'].get('page')}\n"
-            f"Content: {doc['document']}\n\n"
-        )
+    if results:
+        for doc in results:
+            context += (
+                f"Source: {doc['metadata'].get('source_file')}\n"
+                f"Page: {doc['metadata'].get('page')}\n"
+                f"Content: {doc['document']}\n\n"
+            )
 
-    if not context:
-        return "No relevant context found in documents.", []
+    prompt = f"""You are a helpful and intelligent AI assistant.
 
-    prompt = f"""
-You are a helpful AI assistant.
+You have access to the following context extracted from uploaded documents (if available):
+---
+{context.strip() if context and context.strip() else "No document context available."}
+---
 
-Answer the user's question only from the given context make with help of llm and give proper sentence.
+User Question: {query}
 
-If the answer is not available in the context , reply:
-"."
+Instructions:
+1. If the user's question is related to or can be answered using the document context above, use that context to provide a clear, accurate, and complete response in natural language.
+2. If the user's question is a general AI or general knowledge question, or if the document context does not contain the answer, use your general knowledge to answer the user's question fully and accurately in natural language.
+3. Never return "." or an empty response. Always provide a helpful answer in complete sentences.
 
-Context:
-{context}
+Answer:"""
 
-Question:
-{query}
-
-Answer:
-"""
     response = llm.invoke(prompt)
-    return response.content, results
+    answer = response.content.strip() if hasattr(response, "content") else str(response).strip()
+
+    if answer == "." or not answer:
+        general_prompt = f"Please answer the following question clearly and concisely in complete sentences:\n{query}"
+        fallback_resp = llm.invoke(general_prompt)
+        answer = fallback_resp.content.strip() if hasattr(fallback_resp, "content") else str(fallback_resp).strip()
+
+    return answer, results
 
 
 def rag_simple(query, retriever, llm, top_k=3):
