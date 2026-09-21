@@ -161,7 +161,7 @@ User Question: {query}
 
 Instructions:
 1. If the user's question is related to or can be answered using the document context above, use that context to provide a clear, accurate, and complete response in natural language.
-2. If the user's question is a general AI or general knowledge question, or if the document context does not contain the answer, use your general knowledge to answer the user's question fully and accurately in natural language.
+2. If user's question is a general AI or general knowledge question, or if the document context does not contain the answer, use your general knowledge to answer the user's question fully and accurately in natural language.
 3. Never return "." or an empty response. Always provide a helpful answer in complete sentences.
 
 Answer:"""
