@@ -1,28 +1,39 @@
+# ============================================================
+# Google Cloud Build CI/CD
+# GitHub -> Cloud Build -> Artifact Registry -> Cloud Run
+# ============================================================
+
 steps:
 
   # ==========================================================
-  # 1. TEST
+  # STEP 1: TEST
   # ==========================================================
   - name: 'python:3.10-slim'
     id: 'run-tests'
-
     entrypoint: 'bash'
+    secretEnv:
+      - 'GROQ_API_KEY'
 
     args:
       - '-c'
       - |
         set -e
 
-        echo "Installing dependencies..."
+        echo "======================================"
+        echo "Installing dependencies"
+        echo "======================================"
 
         python -m pip install --upgrade pip
+
         pip install flake8 pytest
 
         if [ -f requirements.txt ]; then
           pip install -r requirements.txt
         fi
 
-        echo "Running Flake8..."
+        echo "======================================"
+        echo "Running Flake8"
+        echo "======================================"
 
         flake8 . \
           --count \
@@ -30,7 +41,9 @@ steps:
           --show-source \
           --statistics
 
-        echo "Running tests..."
+        echo "======================================"
+        echo "Running Pytest"
+        echo "======================================"
 
         if [ -d tests ]; then
           pytest tests/
@@ -38,11 +51,13 @@ steps:
           echo "No tests directory found."
         fi
 
-        echo "Tests completed successfully."
+        echo "======================================"
+        echo "Tests completed successfully"
+        echo "======================================"
 
 
   # ==========================================================
-  # 2. BUILD DOCKER IMAGE
+  # STEP 2: BUILD DOCKER IMAGE
   # ==========================================================
   - name: 'gcr.io/cloud-builders/docker'
     id: 'build-image'
@@ -50,20 +65,24 @@ steps:
     args:
       - 'build'
 
+      # Image with Cloud Build BUILD_ID
       - '-t'
-      - '${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:$COMMIT_SHA'
+      - '${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:$BUILD_ID'
 
+      # latest tag
       - '-t'
       - '${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:latest'
 
+      # Dockerfile location
       - '-f'
       - 'Dockerfile'
 
+      # Build context
       - '.'
 
 
   # ==========================================================
-  # 3. PUSH IMAGE TO ARTIFACT REGISTRY
+  # STEP 3: PUSH DOCKER IMAGE
   # ==========================================================
   - name: 'gcr.io/cloud-builders/docker'
     id: 'push-image'
@@ -75,7 +94,7 @@ steps:
 
 
   # ==========================================================
-  # 4. DEPLOY TO CLOUD RUN
+  # STEP 4: DEPLOY TO CLOUD RUN
   # ==========================================================
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'deploy-cloud-run'
@@ -86,11 +105,13 @@ steps:
 
       - 'run'
       - 'deploy'
+
+      # Cloud Run service name
       - '${_SERVICE_NAME}'
 
       # Docker image
       - '--image'
-      - '${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:$COMMIT_SHA'
+      - '${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:$BUILD_ID'
 
       # Region
       - '--region'
@@ -103,44 +124,49 @@ steps:
       # Public access
       - '--allow-unauthenticated'
 
+      # Container port
+      - '--port'
+      - '8080'
+
       # CPU
       - '--cpu'
       - '2'
 
       # Memory
       - '--memory'
-      - '4Gi'
+      - '2Gi'
 
-      # Scaling
+      # Scale to zero when not used
       - '--min-instances'
       - '0'
 
+      # Keep maximum instances low
       - '--max-instances'
       - '1'
 
-      # Container port
-      - '--port'
-      - '8000'
+      # Application environment variable
+      - '--set-env-vars'
+      - 'STREAMLIT_BROWSER_GATHER_USAGE_STATS=false'
 
       # Secret Manager
       - '--set-secrets'
       - 'GROQ_API_KEY=GROQ_API_KEY:latest'
 
 
-# ==========================================================
-# IMAGES
-# ==========================================================
+# ============================================================
+# ARTIFACT REGISTRY IMAGES
+# ============================================================
 
 images:
 
-  - '${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:$COMMIT_SHA'
+  - '${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:$BUILD_ID'
 
   - '${_LOCATION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:latest'
 
 
-# ==========================================================
-# VARIABLES
-# ==========================================================
+# ============================================================
+# SUBSTITUTION VARIABLES
+# ============================================================
 
 substitutions:
 
@@ -153,12 +179,22 @@ substitutions:
   _SERVICE_NAME: 'rag-app'
 
 
-# ==========================================================
+# ============================================================
+# SECRET MANAGER
+# ============================================================
+
+availableSecrets:
+
+  secretManager:
+
+    - versionName: 'projects/$PROJECT_ID/secrets/GROQ_API_KEY/versions/latest'
+      env: 'GROQ_API_KEY'
+
+
+# ============================================================
 # BUILD OPTIONS
-# ==========================================================
+# ============================================================
 
 options:
-
-  machineType: 'E2_STANDARD_2'
 
   logging: 'CLOUD_LOGGING_ONLY'
